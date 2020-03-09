@@ -1,3 +1,8 @@
+/**
+ * ref，首先它不是 vue 2.0 中的 ref
+ * ref 的介绍：https://vue-composition-api-rfc.netlify.com/#overhead-of-introducing-refs
+ * ref 和 reactive 的区别：https://vue-composition-api-rfc.netlify.com/#ref-vs-reactive
+ */
 import { track, trigger } from './effect'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import { isObject } from '@vue/shared'
@@ -5,6 +10,7 @@ import { reactive, isReactive } from './reactive'
 import { ComputedRef } from './computed'
 import { CollectionTypes } from './collectionHandlers'
 
+// 用于 TS 区分 Ref 和普通的包含 value 字段的对象
 const isRefSymbol = Symbol()
 
 export interface Ref<T = any> {
@@ -13,6 +19,8 @@ export interface Ref<T = any> {
   // However, checking a symbol on an arbitrary object is much slower than
   // checking a plain property, so we use a _isRef plain property for isRef()
   // check in the actual implementation.
+  // isRef() 方法通过 _isRef 属性来检查是否是 ref 对象类型
+  // 不在接口里声明 _isRef，是因为不想将内部的字段泄露给用户编辑器的补全提示中
   // The reason for not just declaring _isRef in the interface is because we
   // don't want this internal field to leak into userland autocompletion -
   // a private symbol, on the other hand, achieves just that.
@@ -20,16 +28,20 @@ export interface Ref<T = any> {
   value: T
 }
 
+// 所以可以通过 reactive 方法来将普通的对象转换成 ref 对象？
 const convert = <T extends unknown>(val: T): T =>
   isObject(val) ? reactive(val) : val
 
+// 这是给 TS 做类型判断用的？
 export function isRef<T>(r: Ref<T> | unknown): r is Ref<T>
+// 这样能在静态编写阶段就知道调用 isRef 的结果
 export function isRef(r: any): r is Ref {
   return r ? r._isRef === true : false
 }
 
 export function ref<T>(value: T): T extends Ref ? T : Ref<UnwrapRef<T>>
 export function ref<T = any>(): Ref<T | undefined>
+// 创建 Ref 类型
 export function ref(value?: unknown) {
   return createRef(value)
 }
@@ -39,17 +51,20 @@ export function shallowRef<T = any>(): Ref<T | undefined>
 export function shallowRef(value?: unknown) {
   return createRef(value, true)
 }
-
+// 并没有告诉编译器返回的是 Ref 类型
+// 而是通过 ref 和 shallowRef 再包装了一下
 function createRef(value: unknown, shallow = false) {
   if (isRef(value)) {
     return value
   }
+  // shallow 为 false 的话，会先将值转换为响应式对象
   if (!shallow) {
     value = convert(value)
   }
   const r = {
     _isRef: true,
     get value() {
+      // 取值时，设置依赖？
       track(r, TrackOpTypes.GET, 'value')
       return value
     },
