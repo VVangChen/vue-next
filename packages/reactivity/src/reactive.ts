@@ -24,10 +24,12 @@ const readonlyValues = new WeakSet<any>()
 const nonReactiveValues = new WeakSet<any>()
 
 const collectionTypes = new Set<Function>([Set, Map, WeakMap, WeakSet])
+// 用来判断哪些对象是可观察类型
 const isObservableType = /*#__PURE__*/ makeMap(
   'Object,Array,Map,Set,WeakMap,WeakSet'
 )
-
+// 用来判断值是否可被观察
+// 1. 不是vue对象 2.不是vnode 3.是可观察对象 4.不是非响应式值？（应该会在框架初始化时初始化这个set）
 const canObserve = (value: any): boolean => {
   return (
     !value._isVue &&
@@ -37,22 +39,30 @@ const canObserve = (value: any): boolean => {
   )
 }
 
+// 明白了，unwrap的意思是拆解，用来确定值具体类型
 // only unwrap nested ref
 type UnwrapNestedRefs<T> = T extends Ref ? T : UnwrapRef<T>
 
+// reactive 函数，接收一个对象，返回 NestedRefs 类型
 export function reactive<T extends object>(target: T): UnwrapNestedRefs<T>
 export function reactive(target: object) {
+  // readonly 代理对象，直接返回
   // if trying to observe a readonly proxy, return the readonly version.
   if (readonlyToRaw.has(target)) {
     return target
   }
+  // 被用户显式的标记为 readonly
+  // 返回 readonly 代理对象
+  // readonlyToRaw 是什么？
   // target is explicitly marked as readonly by user
   if (readonlyValues.has(target)) {
     return readonly(target)
   }
+  // 如果是 ref，直接返回
   if (isRef(target)) {
     return target
   }
+  // 返回创建的响应式对象
   return createReactiveObject(
     target,
     rawToReactive,

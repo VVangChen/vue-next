@@ -69,7 +69,9 @@ function createRef(value: unknown, shallow = false) {
       return value
     },
     set value(newVal) {
+      // 设置时，如果 !shallow，会转换下新值
       value = shallow ? newVal : convert(newVal)
+      // 这是做什么？
       trigger(
         r,
         TriggerOpTypes.SET,
@@ -81,10 +83,12 @@ function createRef(value: unknown, shallow = false) {
   return r
 }
 
+// 表面意思上是释放引用，获取 primitive value
 export function unref<T>(ref: T): T extends Ref<infer V> ? V : T {
   return isRef(ref) ? (ref.value as any) : ref
 }
 
+// 接收一个响应式对象，将其所有属性转换为 ref 数组？
 export function toRefs<T extends object>(
   object: T
 ): { [K in keyof T]: Ref<T[K]> } {
@@ -98,6 +102,7 @@ export function toRefs<T extends object>(
   return ret
 }
 
+// 所以 ref 本质上是一个包含访问器属性的对象
 function toProxyRef<T extends object, K extends keyof T>(
   object: T,
   key: K
@@ -118,6 +123,8 @@ function toProxyRef<T extends object, K extends keyof T>(
 // RelativePath extends object -> true
 type BaseTypes = string | number | boolean
 
+// 没太懂，递归地拆解嵌套的值绑定？
+// infer 是什么？
 // Recursively unwraps nested value bindings.
 export type UnwrapRef<T> = {
   cRef: T extends ComputedRef<infer V> ? UnwrapRef<V> : T
