@@ -12,6 +12,7 @@ import {
 import { UnwrapRef, Ref, isRef } from './ref'
 import { makeMap } from '@vue/shared'
 
+// 一些映射对象，作为 memo
 // WeakMaps that store {raw <-> observed} pairs.
 const rawToReactive = new WeakMap<any, any>()
 const reactiveToRaw = new WeakMap<any, any>()
@@ -67,7 +68,7 @@ export function reactive(target: object) {
     target,
     rawToReactive,
     reactiveToRaw,
-    mutableHandlers,
+    mutableHandlers, // 需要注意的是这里传入的都是不可变的处理器？
     mutableCollectionHandlers
   )
 }
@@ -118,6 +119,7 @@ export function shallowReactive<T extends object>(target: T): T {
   )
 }
 
+// 创建响应式对象
 function createReactiveObject(
   target: unknown,
   toProxy: WeakMap<any, any>,
@@ -131,25 +133,40 @@ function createReactiveObject(
     }
     return target
   }
+
+  // 如果已经创建过，直接返回
   // target already has corresponding Proxy
   let observed = toProxy.get(target)
   if (observed !== void 0) {
     return observed
   }
+
+  // 为什么要再进行一次反向地判断？
+  // 按道理讲，如果已经创建过代理对象，在上一层就返回了？
+  // 在什么情况下，会出现 toProxy 里没有，但 toRaw 里有？
   // target is already a Proxy
   if (toRaw.has(target)) {
     return target
   }
+
+  // 如果不可被观察，则直接返回
   // only a whitelist of value types can be observed.
   if (!canObserve(target)) {
     return target
   }
+
+  // 如果是集合类型，使用集合处理器，否则使用普通的处理器
   const handlers = collectionTypes.has(target.constructor)
     ? collectionHandlers
     : baseHandlers
+
+  // 创建代理对象
   observed = new Proxy(target, handlers)
+
+  // 设置 memo
   toProxy.set(target, observed)
   toRaw.set(observed, target)
+
   return observed
 }
 

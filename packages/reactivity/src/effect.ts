@@ -135,7 +135,12 @@ export function resetTracking() {
   shouldTrack = last === undefined ? true : last
 }
 
+// 现在“跟踪“被视为一个副作用，确实
+// 在 2.0 这叫 ”收集依赖“ ？
 export function track(target: object, type: TrackOpTypes, key: unknown) {
+  // 两种情况不进行跟踪
+  // 1. 不应该跟踪？
+  // 2. activeEffect === undefined ？activeEffect 是什么？
   if (!shouldTrack || activeEffect === undefined) {
     return
   }

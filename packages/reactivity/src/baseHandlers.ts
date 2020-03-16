@@ -16,6 +16,7 @@ const shallowReactiveGet = /*#__PURE__*/ createGetter(false, true)
 const readonlyGet = /*#__PURE__*/ createGetter(true)
 const shallowReadonlyGet = /*#__PURE__*/ createGetter(true, true)
 
+// 记录类型是否通用？string => func
 const arrayInstrumentations: Record<string, Function> = {}
 ;['includes', 'indexOf', 'lastIndexOf'].forEach(key => {
   arrayInstrumentations[key] = function(...args: any[]): any {
@@ -34,15 +35,22 @@ const arrayInstrumentations: Record<string, Function> = {}
   }
 })
 
+// 这边的逻辑可以回答这么一个问题：访问 vue 响应对象，vue 会做什么？
 function createGetter(isReadonly = false, shallow = false) {
   return function get(target: object, key: string | symbol, receiver: object) {
+    // 如果对象是数组，并且访问的是 includes, indexOf, lastIndexOf，则直接返回
+    // 反射和直接访问有什么区别？
     if (isArray(target) && hasOwn(arrayInstrumentations, key)) {
       return Reflect.get(arrayInstrumentations, key, receiver)
     }
+    // 获取返回值
     const res = Reflect.get(target, key, receiver)
+    // 如果 key 是内建的 symbol 类型
+    // 内建的 synmbol 类型有哪些？
     if (isSymbol(key) && builtInSymbols.has(key)) {
       return res
     }
+    // 其实很奇怪，shallow 为什么要到处传，而不是作为响应式对象的一个属性？
     if (shallow) {
       track(target, TrackOpTypes.GET, key)
       // TODO strict mode that returns a shallow-readonly version of the value
