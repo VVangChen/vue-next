@@ -2,6 +2,15 @@
  * ref，首先它不是 vue 2.0 中的 ref
  * ref 的介绍：https://vue-composition-api-rfc.netlify.com/#overhead-of-introducing-refs
  * ref 和 reactive 的区别：https://vue-composition-api-rfc.netlify.com/#ref-vs-reactive
+ *
+ * 这个文件包含 ref 类型的定义和创建 ref 相关的方法
+ * 暴露的接口有：
+ * - 创建两种 ref
+ *   - 普通
+ *   - shallow
+ * - 类型判断函数 isRef
+ * - 解构函数 unref
+ * - 转换函数 toRefs
  */
 import { track, trigger } from './effect'
 import { TrackOpTypes, TriggerOpTypes } from './operations'

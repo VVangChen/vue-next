@@ -51,21 +51,27 @@ function createGetter(isReadonly = false, shallow = false) {
       return res
     }
     // 其实很奇怪，shallow 为什么要到处传，而不是作为响应式对象的一个属性？
+    // 如果是 shallow 对象，不会解构 ref 值，也不会递归地将属性对象转换为响应式对象
     if (shallow) {
       track(target, TrackOpTypes.GET, key)
       // TODO strict mode that returns a shallow-readonly version of the value
       return res
     }
+
+    // 如果属性是 ref 类型，且对象不是数组类型，则返回 ref 的值
     // ref unwrapping, only for Objects, not for Arrays.
     if (isRef(res) && !isArray(target)) {
       return res.value
     }
     track(target, TrackOpTypes.GET, key)
     return isObject(res)
+      // 什么时候会指定 readonly？
+      // 原对象是不可变的，会创建只可读的响应式对象
       ? isReadonly
         ? // need to lazy access readonly and reactive here to avoid
           // circular dependency
           readonly(res)
+          // 如果访问的是一个对象，现在会自动将其转换为响应式对象？
         : reactive(res)
       : res
   }
@@ -76,6 +82,7 @@ const shallowReactiveSet = /*#__PURE__*/ createSetter(false, true)
 const readonlySet = /*#__PURE__*/ createSetter(true)
 const shallowReadonlySet = /*#__PURE__*/ createSetter(true, true)
 
+// 创建setter，主要是响应式对象更新值的逻辑，会触发依赖方的值更新
 function createSetter(isReadonly = false, shallow = false) {
   return function set(
     target: object,
@@ -83,6 +90,7 @@ function createSetter(isReadonly = false, shallow = false) {
     value: unknown,
     receiver: object
   ): boolean {
+    // LOCKED ?
     if (isReadonly && LOCKED) {
       if (__DEV__) {
         console.warn(
@@ -95,7 +103,10 @@ function createSetter(isReadonly = false, shallow = false) {
 
     const oldValue = (target as any)[key]
     if (!shallow) {
+      // 这个 toRaw 是什么意思？转换成 raw 值？
+      // 如果创建过响应式对象，确实可以通过 memo 取到原来的值，没有则直接返回，被视为原生值
       value = toRaw(value)
+      // 如果对象不是数组，以前的值是 ref，但新值不是
       if (!isArray(target) && isRef(oldValue) && !isRef(value)) {
         oldValue.value = value
         return true
@@ -105,9 +116,13 @@ function createSetter(isReadonly = false, shallow = false) {
     }
 
     const hadKey = hasOwn(target, key)
+    // 为什么 set 也用反射？
     const result = Reflect.set(target, key, value, receiver)
     // don't trigger if target is something up in the prototype chain of original
+    // 这判断什么意思？在什么情况下不会触发更新
     if (target === toRaw(receiver)) {
+
+      // 区分触发add/set事件，更新依赖方的值
       if (!hadKey) {
         trigger(target, TriggerOpTypes.ADD, key, value)
       } else if (hasChanged(value, oldValue)) {
@@ -139,6 +154,7 @@ function ownKeys(target: object): (string | number | symbol)[] {
   return Reflect.ownKeys(target)
 }
 
+// 用于创建普通的响应式对象
 export const mutableHandlers: ProxyHandler<object> = {
   get,
   set,
@@ -147,6 +163,7 @@ export const mutableHandlers: ProxyHandler<object> = {
   ownKeys
 }
 
+// 用于创建只读的响应式对象
 export const readonlyHandlers: ProxyHandler<object> = {
   get: readonlyGet,
   set: readonlySet,
@@ -169,12 +186,17 @@ export const readonlyHandlers: ProxyHandler<object> = {
   }
 }
 
+// 用于创建浅的响应式对象
 export const shallowReactiveHandlers: ProxyHandler<object> = {
   ...mutableHandlers,
   get: shallowReactiveGet,
   set: shallowReactiveSet
 }
 
+// 主要用于创建 props 响应式对象
+// 如果 props 对象ref属性被解构会发生什么？
+// 被组件继续下传，就会变成原生值类型，就不能被跟踪了
+// 所以这里说是为了允许 refs 被显式的下传
 // Props handlers are special in the sense that it should not unwrap top-level
 // refs (in order to allow refs to be explicitly passed down), but should
 // retain the reactivity of the normal readonly object.

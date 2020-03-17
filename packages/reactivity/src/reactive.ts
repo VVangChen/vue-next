@@ -1,3 +1,15 @@
+/**
+ * 这个文件主要包含创建响应式对象的相关方法
+ * 暴露的接口包含：
+ * - 创建四种不同的响应式对象
+ *   - 普通的
+ *   - 只读
+ *   - 浅对象
+ *   - 只读的浅对象（props）
+ * - 判断响应式对象类型函数
+ *
+ * 创建不同的响应式对象，主要的区别在于它们的处理器不同，详见 ./baseHandlers.ts
+ */
 import { isObject, toRawType } from '@vue/shared'
 import {
   mutableHandlers,
@@ -73,6 +85,7 @@ export function reactive(target: object) {
   )
 }
 
+// 创建只读的响应式对象
 export function readonly<T extends object>(
   target: T
 ): Readonly<UnwrapNestedRefs<T>> {
@@ -85,7 +98,7 @@ export function readonly<T extends object>(
     target,
     rawToReadonly,
     readonlyToRaw,
-    readonlyHandlers,
+    readonlyHandlers, // 只读的处理器有什么区别？
     readonlyCollectionHandlers
   )
 }
@@ -93,6 +106,7 @@ export function readonly<T extends object>(
 // Return a reactive-copy of the original object, where only the root level
 // properties are readonly, and does NOT unwrap refs nor recursively convert
 // returned properties.
+// 用于给状态组件创建 props 代理对象
 // This is used for creating the props proxy object for stateful components.
 export function shallowReadonly<T extends object>(
   target: T
@@ -182,11 +196,13 @@ export function toRaw<T>(observed: T): T {
   return reactiveToRaw.get(observed) || readonlyToRaw.get(observed) || observed
 }
 
+// 这种会用在哪里？
 export function markReadonly<T>(value: T): T {
   readonlyValues.add(value)
   return value
 }
 
+// 这种会用在哪里？
 export function markNonReactive<T>(value: T): T {
   nonReactiveValues.add(value)
   return value
