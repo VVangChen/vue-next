@@ -1,6 +1,9 @@
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import { EMPTY_OBJ, extend, isArray } from '@vue/shared'
 
+// 忘了 vue 2 是怎么关联依赖方和被依赖方
+// vue 3 使用了 weakMap 储存了 target -> key -> dep 这样一个映射
+// 目的是为了降低内存负担
 // The main WeakMap that stores {target -> key -> dep} connections.
 // Conceptually, it's easier to think of a dependency as a Dep class
 // which maintains a Set of subscribers, but we simply store them as
@@ -20,11 +23,11 @@ export interface ReactiveEffect<T = any> {
 }
 
 export interface ReactiveEffectOptions {
-  lazy?: boolean
+  lazy?: boolean // 对应于 !immediate?
   computed?: boolean
-  scheduler?: (run: Function) => void
-  onTrack?: (event: DebuggerEvent) => void
-  onTrigger?: (event: DebuggerEvent) => void
+  scheduler?: (run: Function) => void // 执行副作用时，如果有scheduler，通过 scheduler 执行
+  onTrack?: (event: DebuggerEvent) => void // dev
+  onTrigger?: (event: DebuggerEvent) => void // dev
   onStop?: () => void
 }
 
@@ -52,6 +55,7 @@ export function isEffect(fn: any): fn is ReactiveEffect {
   return fn != null && fn._isEffect === true
 }
 
+// 暴露出去的接口，用于创建副作用
 export function effect<T = any>(
   fn: () => T,
   options: ReactiveEffectOptions = EMPTY_OBJ
@@ -66,6 +70,7 @@ export function effect<T = any>(
   return effect
 }
 
+// 不知道什么时候回调？
 export function stop(effect: ReactiveEffect) {
   if (effect.active) {
     cleanup(effect)
@@ -76,6 +81,7 @@ export function stop(effect: ReactiveEffect) {
   }
 }
 
+// 创建响应式副作用
 function createReactiveEffect<T = any>(
   fn: () => T,
   options: ReactiveEffectOptions
@@ -203,6 +209,8 @@ export function track(target: object, type: TrackOpTypes, key: unknown) {
 }
 
 // 更新依赖方的值？
+// 收集依赖当前变化的响应式属性的依赖方，依赖方是一个响应式副作用
+// 安排并执行这些副作用
 export function trigger(
   target: object,
   type: TriggerOpTypes,
@@ -243,6 +251,7 @@ export function trigger(
     // 是说一些操作可能会影响 length 这种迭代相关的 key 值
     // 所以需要添加相应的副作用？
     // also run for iteration key on ADD | DELETE | Map.SET
+    // 是不是意味着，可以通过依赖 length 或者 ITERATE_KEY 来实现下面这三种操作的强制更新？
     if (
       type === TriggerOpTypes.ADD ||
       (type === TriggerOpTypes.DELETE && !isArray(target)) ||

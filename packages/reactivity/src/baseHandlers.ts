@@ -133,9 +133,11 @@ function createSetter(isReadonly = false, shallow = false) {
   }
 }
 
+// 删除属性代理逻辑
 function deleteProperty(target: object, key: string | symbol): boolean {
   const hadKey = hasOwn(target, key)
   const oldValue = (target as any)[key]
+  // 为什么全用反射？
   const result = Reflect.deleteProperty(target, key)
   if (result && hadKey) {
     trigger(target, TriggerOpTypes.DELETE, key, undefined, oldValue)
@@ -143,12 +145,18 @@ function deleteProperty(target: object, key: string | symbol): boolean {
   return result
 }
 
+// 执行什么逻辑会走到 has？
+// has 一般用来判断，判断也会成为跟踪依赖的原因之一
 function has(target: object, key: string | symbol): boolean {
   const result = Reflect.has(target, key)
   track(target, TrackOpTypes.HAS, key)
   return result
 }
 
+// 什么时候回走到 ownKeys？
+// 这能够回答什么 trigger 里的一段逻辑
+// 当获取对象的所有键值时，会被视为属于依赖的行为，也会进行 track 操作
+// 感觉在 vue 2.0 是没有实现的吧？
 function ownKeys(target: object): (string | number | symbol)[] {
   track(target, TrackOpTypes.ITERATE, ITERATE_KEY)
   return Reflect.ownKeys(target)
