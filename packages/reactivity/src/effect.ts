@@ -1,3 +1,11 @@
+/**
+ * Effect 定义了响应式属性的副作用 -> 依赖方的值更新
+ * 这个文件包含 Effect 相关函数：
+ * 1. 创建 Effect
+ * 2. track 跟踪依赖
+ * 3. trigger 触发 Effect 执行
+ * 4. 其他类型定义和判断方法
+ */
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import { EMPTY_OBJ, extend, isArray } from '@vue/shared'
 
@@ -277,6 +285,7 @@ export function trigger(
         : undefined
     )
   }
+  // computed Effect 优先级高于其他对象，因为 computed 本身也可能是一个依赖
   // Important: computed effects must be run first so that computed getters
   // can be invalidated before any normal effects that depend on them are run.
   computedRunners.forEach(run)

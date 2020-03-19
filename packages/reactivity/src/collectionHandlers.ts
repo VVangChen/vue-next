@@ -1,3 +1,7 @@
+/**
+ * 这个文件包含集合对象类型的代理所需要的 handlers
+ * 暴露了两种：mutable, readonly
+ */
 import { toRaw, reactive, readonly } from './reactive'
 import { track, trigger, ITERATE_KEY } from './effect'
 import { TrackOpTypes, TriggerOpTypes } from './operations'

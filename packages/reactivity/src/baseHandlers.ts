@@ -1,3 +1,8 @@
+/**
+ * 这个文件包含非集合类型代理的处理器
+ * 对应于四种响应式对象，也暴露了四种处理器
+ * mutable, readonly, shallow, shallowReadonly
+ */
 import { reactive, readonly, toRaw } from './reactive'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import { track, trigger, ITERATE_KEY } from './effect'
