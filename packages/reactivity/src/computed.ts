@@ -10,6 +10,7 @@ export interface ComputedRef<T = any> extends WritableComputedRef<T> {
   readonly value: T
 }
 
+// 所以 computed 本质是个带有 effect 的 ref
 export interface WritableComputedRef<T> extends Ref<T> {
   readonly effect: ReactiveEffect<T>
 }

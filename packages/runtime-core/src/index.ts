@@ -1,5 +1,5 @@
 // Public API ------------------------------------------------------------------
-
+// 所以 __VERSION__ 是在哪赋值的？
 export const version = __VERSION__
 export {
   ref,

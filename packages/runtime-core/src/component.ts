@@ -522,6 +522,8 @@ function createSetupContext(instance: ComponentInternalInstance): SetupContext {
   return __DEV__ ? Object.freeze(context) : context
 }
 
+// 在组件执行 setup 逻辑时记录所有 effect
+// 以便组件在 unmount 时停止这些 effect
 // record effects created during a component's setup() so that they can be
 // stopped when the component unmounts
 export function recordInstanceBoundEffect(effect: ReactiveEffect) {

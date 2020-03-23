@@ -71,11 +71,14 @@ export type StopHandle = () => void
 
 const invoke = (fn: Function) => fn()
 
+// 创建 watch 副作用？
 // Simple effect.
 export function watchEffect(
   effect: WatchEffect,
   options?: BaseWatchOptions
 ): StopHandle {
+  // 不设置回调？
+  // 直接观察 watchEffct？
   return doWatch(effect, null, options)
 }
 
@@ -118,13 +121,20 @@ export function watch<T = any>(
   return doWatch(source, cb, options)
 }
 
+// watch 的内部实现
+// source 表示观察的对象
+// cb 表示观察的回调
+// options...
 function doWatch(
   source: WatchSource | WatchSource[] | WatchEffect,
   cb: WatchCallback | null,
   { immediate, deep, flush, onTrack, onTrigger }: WatchOptions = EMPTY_OBJ
 ): StopHandle {
+  // cb 不传会是什么效果？
+  // 在什么时候不传 cb ？
   if (__DEV__ && !cb) {
     if (immediate !== undefined) {
+      // immediate 和 deep 希望被用于传了 cb 的情况
       warn(
         `watch() "immediate" option is only respected when using the ` +
           `watch(source, callback, options?) signature.`
@@ -139,32 +149,41 @@ function doWatch(
   }
 
   const instance = currentInstance
-  const suspense = currentSuspense
+  const suspense = currentSuspense // 挂起的？这是什么？
 
+  // 分情况给 getter 赋值
+  // getter 是什么？
   let getter: () => any
+  // 观察源是个数组
   if (isArray(source)) {
     getter = () =>
       source.map(
         s =>
+          // 观察源数组中的元素必须是 ref 类型？
           isRef(s)
             ? s.value
             : callWithErrorHandling(s, instance, ErrorCodes.WATCH_GETTER)
       )
-  } else if (isRef(source)) {
+  } else if (isRef(source)) { // 观察源是 ref
     getter = () => source.value
-  } else if (cb) {
+  } else if (cb) { // 都不是但有 cb 直接调用 source ？这和兜底逻辑有什么区别？
     // getter with cb
     getter = () =>
       callWithErrorHandling(source, instance, ErrorCodes.WATCH_GETTER)
   } else {
+    // 没有 cb，被认为是简单的副作用？估计得看到下面才能理解
     // no cb -> simple effect
     getter = () => {
+      // 如果未挂载直接返回
       if (instance && instance.isUnmounted) {
         return
       }
+      // 如果 cleanup 有值，直接执行？
+      // 它是干嘛的？
       if (cleanup) {
         cleanup()
       }
+      // 如果没有设置回调会直接调用
       return callWithErrorHandling(
         source,
         instance,
@@ -174,20 +193,28 @@ function doWatch(
     }
   }
 
+  // 如果是 deep，且传了 cb
   if (cb && deep) {
     const baseGetter = getter
     getter = () => traverse(baseGetter())
   }
+  // getter 初始化/赋值结束
 
   let cleanup: Function
+  // cleanup 只有在 invalidate 时被赋值
+  // 失效事件的 handler
   const onInvalidate: InvalidateCbRegistrator = (fn: () => void) => {
+    // cleanup 调用了注册 invalidate 事件是，传的回调
     cleanup = runner.options.onStop = () => {
       callWithErrorHandling(fn, instance, ErrorCodes.WATCH_CLEANUP)
     }
   }
 
+  // 在 node SSR 中，不会被设置 effect，返回 noop
+  // 如果是 simple watch / immediate 为 true，直接调用 source 或 cb
   // in SSR there is no need to setup an actual effect, and it should be noop
   // unless it's eager
+  // 有挺多全局变量的，得记下来
   if (__NODE_JS__ && isInSSRComponentSetup) {
     if (!cb) {
       getter()
@@ -287,6 +314,11 @@ export function instanceWatch(
   return stop
 }
 
+// 不知道遍历是做什么？
+// 这个函数的逻辑就是递归遍历传入的对象/数组/map/set参数
+// 把所有值都塞到 seen 里，问题是 seen 没被任何地方用到
+// traverse 只在指定了 deep 时被使用，在 deep 的 getter 中被调用，但并没有传入 seen 值
+// 没看懂作者想做什么
 function traverse(value: unknown, seen: Set<unknown> = new Set()) {
   if (!isObject(value) || seen.has(value)) {
     return
