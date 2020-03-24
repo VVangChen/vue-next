@@ -1,3 +1,13 @@
+/**
+ * this.$watch 的实现
+ * watch 方法有两种重载方式：
+ * 1. simple watch
+ * 2. vue 暴露的 watch 接口
+ *
+ * 问题：
+ * - simple watch 在什么时候会被使用？
+ * - 它和普通的 watch 区别在哪？如果区别很大，为什么还叫 watch ？
+ */
 import {
   effect,
   stop,
@@ -72,6 +82,7 @@ export type StopHandle = () => void
 const invoke = (fn: Function) => fn()
 
 // 创建 watch 副作用？
+// 这个什么时候回被调用
 // Simple effect.
 export function watchEffect(
   effect: WatchEffect,
@@ -85,6 +96,7 @@ export function watchEffect(
 // initial value for watchers to trigger on undefined initial values
 const INITIAL_WATCHER_VALUE = {}
 
+// 两种 watch 重载
 // overload #1: single source + cb
 export function watch<T, Immediate extends Readonly<boolean> = false>(
   source: WatchSource<T>,
@@ -229,6 +241,8 @@ function doWatch(
   }
 
   let oldValue = isArray(source) ? [] : INITIAL_WATCHER_VALUE
+  // 这是干什么用的？
+  // watch 更新值时执行逻辑
   const applyCb = cb
     ? () => {
         if (instance && instance.isUnmounted) {
@@ -251,10 +265,14 @@ function doWatch(
       }
     : void 0
 
+  // 分情况设置调度器
   let scheduler: (job: () => any) => void
+  // 什么时候会设置 flush 为 sync / pre
   if (flush === 'sync') {
+    // 同步就是直接调用
     scheduler = invoke
   } else if (flush === 'pre') {
+    // 没太看懂 pre 目的是什么？
     scheduler = job => {
       if (!instance || instance.vnode.el != null) {
         queueJob(job)
@@ -265,6 +283,8 @@ function doWatch(
       }
     }
   } else {
+    // 大部分情况？
+    // 会安排任务在渲染副作用之后？
     scheduler = job => {
       queuePostRenderEffect(job, suspense)
     }
@@ -281,6 +301,9 @@ function doWatch(
 
   recordInstanceBoundEffect(runner)
 
+  // 如果有传 cb，且 immdiate 为 true，立即执行回调
+  // 如果没传 cb，则立即执行副作用
+  // 这一步主要是为了注册依赖
   // initial run
   if (applyCb) {
     if (immediate) {
@@ -292,6 +315,9 @@ function doWatch(
     runner()
   }
 
+  // stop handle 执行逻辑
+  // 设置 runner 为 !active
+  // 移除实例所有副作用
   return () => {
     stop(runner)
     if (instance) {
@@ -307,9 +333,11 @@ export function instanceWatch(
   cb: Function,
   options?: WatchOptions
 ): StopHandle {
+  // 上下文是组件实例的 proxy
   const ctx = this.proxy as Data
   const getter = isString(source) ? () => ctx[source] : source.bind(ctx)
   const stop = watch(getter, cb.bind(ctx), options)
+  // 会在组件 beforeUnmount 时自动停止
   onBeforeUnmount(stop, this)
   return stop
 }
@@ -319,6 +347,8 @@ export function instanceWatch(
 // 把所有值都塞到 seen 里，问题是 seen 没被任何地方用到
 // traverse 只在指定了 deep 时被使用，在 deep 的 getter 中被调用，但并没有传入 seen 值
 // 没看懂作者想做什么
+// -------
+// 懂了，如果 source 是深层对象，需要递归的进行访问，以便能注册依赖
 function traverse(value: unknown, seen: Set<unknown> = new Set()) {
   if (!isObject(value) || seen.has(value)) {
     return

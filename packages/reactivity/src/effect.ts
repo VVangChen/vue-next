@@ -78,7 +78,8 @@ export function effect<T = any>(
   return effect
 }
 
-// 不知道什么时候回调？
+// 不知道什么时候会调？
+// 1. 创建 watch 返回的停止函数中会调用
 export function stop(effect: ReactiveEffect) {
   if (effect.active) {
     cleanup(effect)

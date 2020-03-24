@@ -2,6 +2,7 @@
 
 - runtime-core 和 runtime-dom 的关系？
 - runtime 和 reactivity 代码的界限在哪里？
+- watch 是怎么被标记为被观察者的依赖方？
 
 ## 依赖
 

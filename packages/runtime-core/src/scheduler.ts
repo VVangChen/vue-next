@@ -75,6 +75,7 @@ function flushJobs(seen?: CountMap) {
       continue
     }
     if (__DEV__) {
+      // seen 是防止递归更新
       checkRecursiveUpdates(seen!, job)
     }
     callWithErrorHandling(job, null, ErrorCodes.SCHEDULER)

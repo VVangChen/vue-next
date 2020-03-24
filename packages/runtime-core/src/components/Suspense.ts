@@ -15,6 +15,7 @@ export interface SuspenseProps {
 
 export const isSuspense = (type: any): boolean => type.__isSuspense
 
+// Suspense 暴露了一个类似组件的接口，并且在编译器里被视为组件，但是在内部，它是一个直接依附渲染器的内建类型
 // Suspense exposes a component-like API, and is treated like a component
 // in the compiler, but internally it's a special built-in type that hooks
 // directly into the renderer.
