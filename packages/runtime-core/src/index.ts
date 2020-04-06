@@ -1,3 +1,11 @@
+/**
+ * 你可以学习到:
+ * 1. runtime-core 包含哪些部分？
+ * 2. 每个部分包含什么？
+ * 3. 一些公共的 API 是如何实现的？比如生命周期、computed、watch 等
+ */
+
+// runtime-core 第一部分：公共 API
 // Public API ------------------------------------------------------------------
 // 所以 __VERSION__ 是在哪赋值的？
 export const version = __VERSION__
@@ -35,8 +43,10 @@ export { provide, inject } from './apiInject'
 export { nextTick } from './scheduler'
 export { defineComponent } from './apiDefineComponent'
 
+// runtime-core 第二部分：先进的？ API
 // Advanced API ----------------------------------------------------------------
 
+// 获取 setup() 执行时的组件实例，这里说可能被一些先进的插件所使用
 // For getting a hold of the internal instance in setup() - useful for advanced
 // plugins
 export { getCurrentInstance } from './component'
@@ -66,6 +76,7 @@ export { useCSSModule } from './helpers/useCssModule'
 // SSR context
 export { useSSRContext, ssrContextKey } from './helpers/useSsrContext'
 
+// runtime-core 第三部分：内部 API
 // Internal API ----------------------------------------------------------------
 
 // For custom renderers
@@ -106,6 +117,7 @@ export { toDisplayString, camelize } from '@vue/shared'
 // For integration with runtime compiler
 export { registerRuntimeCompiler } from './component'
 
+// runtime-core 第四部分：SSR Utils
 // SSR -------------------------------------------------------------------------
 
 import { createComponentInstance, setupComponent } from './component'
@@ -127,6 +139,7 @@ const _ssrUtils = {
 
 export const ssrUtils = (__NODE_JS__ ? _ssrUtils : null) as typeof _ssrUtils
 
+// runtime-core 第五部分：类型定义
 // Types -----------------------------------------------------------------------
 
 export {

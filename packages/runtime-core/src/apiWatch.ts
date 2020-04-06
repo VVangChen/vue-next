@@ -137,6 +137,7 @@ export function watch<T = any>(
 // source 表示观察的对象
 // cb 表示观察的回调
 // options...
+// 什么时候 watch 的 source 是函数？
 function doWatch(
   source: WatchSource | WatchSource[] | WatchEffect,
   cb: WatchCallback | null,
@@ -176,9 +177,11 @@ function doWatch(
             ? s.value
             : callWithErrorHandling(s, instance, ErrorCodes.WATCH_GETTER)
       )
-  } else if (isRef(source)) { // 观察源是 ref
+  } else if (isRef(source)) {
+    // 观察源是 ref
     getter = () => source.value
-  } else if (cb) { // 都不是但有 cb 直接调用 source ？这和兜底逻辑有什么区别？
+  } else if (cb) {
+    // 都不是但有 cb 直接调用 source ？这和兜底逻辑有什么区别？
     // getter with cb
     getter = () =>
       callWithErrorHandling(source, instance, ErrorCodes.WATCH_GETTER)

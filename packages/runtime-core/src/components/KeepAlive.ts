@@ -40,6 +40,7 @@ export interface KeepAliveSink {
   deactivate: (vnode: VNode) => void
 }
 
+// 通过vnode对象的 __isKeepAlive 来判断是否是 keep alive 组件
 export const isKeepAlive = (vnode: VNode): boolean =>
   (vnode.type as any).__isKeepAlive
 
@@ -259,6 +260,13 @@ function registerKeepAliveHook(
   // cache the deactivate branch check wrapper for injected hooks so the same
   // hook can be properly deduped by the scheduler. "__wdc" stands for "with
   // deactivation check".
+  // __wdc 意思是 with deactivation check
+  // 每个 keep alive 的 hook 都会被包装一遍
+  // 这里说目的是为了使调度器能够正确地删除重复的 hook
+  // 然后怎么包装的呢？
+  // wrappedHook 给每个 hook 设置了 wdc
+  // 用来检查 hook 所在的组件是不是在一个 deactivated 的组件分支上
+  // 如果是的话就不会执行 hook
   const wrappedHook =
     hook.__wdc ||
     (hook.__wdc = () => {
@@ -278,6 +286,9 @@ function registerKeepAliveHook(
   // This avoids the need to walk the entire component tree when invoking these
   // hooks, and more importantly, avoids the need to track child components in
   // arrays.
+  // activated 和 deactivated hook 都会挂载到 keep-alive 的根组件上
+  // 目的是避免在需要调用 hook 时遍历整个组件树
+  // 更重要的，避免通过数组来跟踪子组件？没太明白...
   if (target) {
     let current = target.parent
     while (current && current.parent) {

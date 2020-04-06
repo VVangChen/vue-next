@@ -1,3 +1,17 @@
+/**
+ * 想查看运行时会处理的所有错误，可以参考：ErrorTypeStrings
+ * 错误处理的方法无非两种：
+ * 1. try...catch
+ * 2. promise.catch
+ * 分别用于同步和异步的逻辑
+ * 所以如果明白以上两点，就没必要花时间看这个文件
+ * 因为代码里会大量调用 callWithErrorHandling 和 callWithAsyncErrorHandling
+ * 所以只要知道它们做了什么就够了，具体实现没什么好学习的
+ *
+ * callWithErrorHandling：= 直接调用 + try...catch
+ * callWithAsyncErrorHandling = callWithErrorHandling + promise.catch
+ * callWithAsyncErrorHandling：第一个参数可以是数组，如果是数组，则会遍历递归
+ */
 import { VNode } from './vnode'
 import { ComponentInternalInstance, LifecycleHooks } from './component'
 import { warn, pushWarningContext, popWarningContext } from './warning'
@@ -54,6 +68,9 @@ export const ErrorTypeStrings: Record<number | string, string> = {
 
 export type ErrorTypes = LifecycleHooks | ErrorCodes
 
+// 核心逻辑就是用 try...catch 包了一下
+// 如果抛错，就用 handleError 处理一下
+// 有个意味是，它在哪些地方被使用了？
 export function callWithErrorHandling(
   fn: Function,
   instance: ComponentInternalInstance | null,
@@ -77,6 +94,7 @@ export function callWithAsyncErrorHandling(
 ): any[] {
   if (isFunction(fn)) {
     const res = callWithErrorHandling(fn, instance, type, args)
+    // 如果函数返回值是 promise，则用 catch 方法处理错误
     if (res != null && !res._isVue && isPromise(res)) {
       res.catch((err: Error) => {
         handleError(err, instance, type)
@@ -92,6 +110,8 @@ export function callWithAsyncErrorHandling(
   return values
 }
 
+// 不管是同步或异步方法，都会使用这个函数来处理错误
+// 错误类型可以参考：ErrorTypeStrings
 export function handleError(
   err: Error,
   instance: ComponentInternalInstance | null,
@@ -136,10 +156,12 @@ export function setErrorRecovery(value: boolean) {
   forceRecover = value
 }
 
+// 打印错误？
 function logError(err: Error, type: ErrorTypes, contextVNode: VNode | null) {
   // default behavior is crash in prod & test, recover in dev.
   if (__DEV__ && (forceRecover || !__TEST__)) {
     const info = ErrorTypeStrings[type]
+    // 这是干啥？
     if (contextVNode) {
       pushWarningContext(contextVNode)
     }
@@ -149,6 +171,7 @@ function logError(err: Error, type: ErrorTypes, contextVNode: VNode | null) {
       popWarningContext()
     }
   } else {
+    // 生产或测试环境就直接抛错了
     throw err
   }
 }

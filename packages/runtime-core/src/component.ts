@@ -264,9 +264,12 @@ export function createComponentInstance(
 export let currentInstance: ComponentInternalInstance | null = null
 export let currentSuspense: SuspenseBoundary | null = null
 
+// 获取 setup() 执行时的实例
 export const getCurrentInstance: () => ComponentInternalInstance | null = () =>
   currentInstance || currentRenderingInstance
 
+// 设置 setup() 执行时的实例
+// 只有 setup 方法中会被调用吗？
 export const setCurrentInstance = (
   instance: ComponentInternalInstance | null
 ) => {

@@ -1,3 +1,7 @@
+/**
+ * 主要是实现了 warn 函数，用于打印发生的错误
+ * 如果不是想自己实现一个 warn 函数，就没必要花时间看这个文件的代码
+ */
 import { VNode } from './vnode'
 import { Data, ComponentInternalInstance, Component } from './component'
 import { isString, isFunction } from '@vue/shared'
@@ -25,12 +29,19 @@ export function popWarningContext() {
   stack.pop()
 }
 
+// 运行时抛错都是通过这个来的
+// 其实没啥好看的，就是打印错误
+// 能学习到的东西有：
+// 1. 可以通过 config 的 warnHandler 设置错误处理器
+// 2. 如何获取错误栈，以及如何格式化错误栈
 export function warn(msg: string, ...args: any[]) {
   // avoid props formatting or warn handler tracking deps that might be mutated
   // during patch, leading to infinite recursion.
+  // 避免 props 格式化或者 warn 处理器跟踪依赖，导致无限递归
   pauseTracking()
 
   const instance = stack.length ? stack[stack.length - 1].component : null
+  // 所以可以通过 config 的 warnHandler 设置警告处理器
   const appWarnHandler = instance && instance.appContext.config.warnHandler
   const trace = getComponentTrace()
 
@@ -63,6 +74,10 @@ export function warn(msg: string, ...args: any[]) {
   resetTracking()
 }
 
+// 获取组件错误栈
+// 其实就是返回了发生错误的虚拟节点树分支
+// 有个特殊的处理就是如果发生错误的 vnode，它的父级和它相同，被视为递归掉用？
+// 但我想不出来什么时候会发生这种事？
 function getComponentTrace(): ComponentTraceStack {
   let currentVNode: VNode | null = stack[stack.length - 1]
   if (!currentVNode) {

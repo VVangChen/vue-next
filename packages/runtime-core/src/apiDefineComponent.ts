@@ -1,3 +1,17 @@
+/**
+ * defineComponent 的实现很简单，我们也能够理解接受两种参数 - 函数和对象
+ *
+ * 这个文件最重要的部分是 defineComponent 的类型定义，值得我们学习
+ * 定义了 defineComponent 四种重载方式：
+ * 1. 参数为 setup 函数
+ * 2. 参数为对象，且没有 props
+ * 3. 参数为对象，且 props 为数组
+ * 4. 参数为对象，且 props 为对象
+ *
+ * new () 在 TS 中代表什么？https://stackoverflow.com/questions/39622778/what-is-new-in-typescript
+ *
+ * 组件实例的定义可看 componentProxy 中的 ComponentPublicInstance
+ */
 import {
   ComputedOptions,
   MethodOptions,
@@ -97,6 +111,9 @@ export function defineComponent<
 }
 
 // implementation, close to no-op
+// 定义组件
+// 如果是函数，则赋给 setup
+// 如果不是，则作为 options
 export function defineComponent(options: unknown) {
   return isFunction(options) ? { setup: options } : options
 }
