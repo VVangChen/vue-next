@@ -1,8 +1,14 @@
-import { reactive, readonly, toRaw } from './reactive'
+import { reactive, readonly, toRaw, ReactiveFlags } from './reactive'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import { track, trigger, ITERATE_KEY } from './effect'
-import { LOCKED } from './lock'
-import { isObject, hasOwn, isSymbol, hasChanged, isArray } from '@vue/shared'
+import {
+  isObject,
+  hasOwn,
+  isSymbol,
+  hasChanged,
+  isArray,
+  extend
+} from '@vue/shared'
 import { isRef } from './ref'
 
 const builtInSymbols = new Set(
@@ -12,7 +18,7 @@ const builtInSymbols = new Set(
 )
 
 const get = /*#__PURE__*/ createGetter()
-const shallowReactiveGet = /*#__PURE__*/ createGetter(false, true)
+const shallowGet = /*#__PURE__*/ createGetter(false, true)
 const readonlyGet = /*#__PURE__*/ createGetter(true)
 const shallowReadonlyGet = /*#__PURE__*/ createGetter(true, true)
 
@@ -23,7 +29,7 @@ const arrayInstrumentations: Record<string, Function> = {}
     for (let i = 0, l = (this as any).length; i < l; i++) {
       track(arr, TrackOpTypes.GET, i + '')
     }
-    // we run the method using the orignal args first (which may be reactive)
+    // we run the method using the original args first (which may be reactive)
     const res = arr[key](...args)
     if (res === -1 || res === false) {
       // if that didn't work, run it again using raw values.
@@ -36,55 +42,65 @@ const arrayInstrumentations: Record<string, Function> = {}
 
 function createGetter(isReadonly = false, shallow = false) {
   return function get(target: object, key: string | symbol, receiver: object) {
-    if (isArray(target) && hasOwn(arrayInstrumentations, key)) {
+    if (key === ReactiveFlags.isReactive) {
+      return !isReadonly
+    } else if (key === ReactiveFlags.isReadonly) {
+      return isReadonly
+    } else if (
+      key === ReactiveFlags.raw &&
+      receiver ===
+        (isReadonly
+          ? (target as any).__v_readonly
+          : (target as any).__v_reactive)
+    ) {
+      return target
+    }
+
+    const targetIsArray = isArray(target)
+    if (targetIsArray && hasOwn(arrayInstrumentations, key)) {
       return Reflect.get(arrayInstrumentations, key, receiver)
     }
+
     const res = Reflect.get(target, key, receiver)
-    if (isSymbol(key) && builtInSymbols.has(key)) {
+
+    if ((isSymbol(key) && builtInSymbols.has(key)) || key === '__proto__') {
       return res
     }
-    if (shallow) {
+
+    if (!isReadonly) {
       track(target, TrackOpTypes.GET, key)
-      // TODO strict mode that returns a shallow-readonly version of the value
+    }
+
+    if (shallow) {
       return res
     }
-    // ref unwrapping, only for Objects, not for Arrays.
-    if (isRef(res) && !isArray(target)) {
-      return res.value
+
+    if (isRef(res)) {
+      // ref unwrapping, only for Objects, not for Arrays.
+      return targetIsArray ? res : res.value
     }
-    track(target, TrackOpTypes.GET, key)
-    return isObject(res)
-      ? isReadonly
-        ? // need to lazy access readonly and reactive here to avoid
-          // circular dependency
-          readonly(res)
-        : reactive(res)
-      : res
+
+    if (isObject(res)) {
+      // Convert returned value into a proxy as well. we do the isObject check
+      // here to avoid invalid value warning. Also need to lazy access readonly
+      // and reactive here to avoid circular dependency.
+      return isReadonly ? readonly(res) : reactive(res)
+    }
+
+    return res
   }
 }
 
 const set = /*#__PURE__*/ createSetter()
-const shallowReactiveSet = /*#__PURE__*/ createSetter(false, true)
-const readonlySet = /*#__PURE__*/ createSetter(true)
-const shallowReadonlySet = /*#__PURE__*/ createSetter(true, true)
+const shallowSet = /*#__PURE__*/ createSetter(true)
 
-function createSetter(isReadonly = false, shallow = false) {
+function createSetter(shallow = false) {
   return function set(
     target: object,
     key: string | symbol,
     value: unknown,
     receiver: object
   ): boolean {
-    if (isReadonly && LOCKED) {
-      if (__DEV__) {
-        console.warn(
-          `Set operation on key "${String(key)}" failed: target is readonly.`,
-          target
-        )
-      }
-      return true
-    }
-
     const oldValue = (target as any)[key]
     if (!shallow) {
       value = toRaw(value)
@@ -141,37 +157,44 @@ export const mutableHandlers: ProxyHandler<object> = {
 
 export const readonlyHandlers: ProxyHandler<object> = {
   get: readonlyGet,
-  set: readonlySet,
   has,
   ownKeys,
-  deleteProperty(target: object, key: string | symbol): boolean {
-    if (LOCKED) {
-      if (__DEV__) {
-        console.warn(
-          `Delete operation on key "${String(
-            key
-          )}" failed: target is readonly.`,
-          target
-        )
-      }
-      return true
-    } else {
-      return deleteProperty(target, key)
+  set(target, key) {
+    if (__DEV__) {
+      console.warn(
+        `Set operation on key "${String(key)}" failed: target is readonly.`,
+        target
+      )
     }
+    return true
+  },
+  deleteProperty(target, key) {
+    if (__DEV__) {
+      console.warn(
+        `Delete operation on key "${String(key)}" failed: target is readonly.`,
+        target
+      )
+    }
+    return true
   }
 }
 
-export const shallowReactiveHandlers: ProxyHandler<object> = {
-  ...mutableHandlers,
-  get: shallowReactiveGet,
-  set: shallowReactiveSet
-}
+export const shallowReactiveHandlers: ProxyHandler<object> = extend(
+  {},
+  mutableHandlers,
+  {
+    get: shallowGet,
+    set: shallowSet
+  }
+)
 
 // Props handlers are special in the sense that it should not unwrap top-level
 // refs (in order to allow refs to be explicitly passed down), but should
 // retain the reactivity of the normal readonly object.
-export const shallowReadonlyHandlers: ProxyHandler<object> = {
-  ...readonlyHandlers,
-  get: shallowReadonlyGet,
-  set: shallowReadonlySet
-}
+export const shallowReadonlyHandlers: ProxyHandler<object> = extend(
+  {},
+  readonlyHandlers,
+  {
+    get: shallowReadonlyGet
+  }
+)

@@ -12,7 +12,9 @@ import {
   SimpleExpressionNode,
   ConditionalExpression,
   IfConditionalExpression,
-  VNodeCall
+  VNodeCall,
+  ElementTypes,
+  IfBranchNode
 } from '../../src/ast'
 import { ErrorCodes } from '../../src/errors'
 import { CompilerOptions, generate } from '../../src'
@@ -76,6 +78,22 @@ describe('compiler: v-if', () => {
       expect((node.branches[0].children[1] as TextNode).content).toBe(`hello`)
       expect(node.branches[0].children[2].type).toBe(NodeTypes.ELEMENT)
       expect((node.branches[0].children[2] as ElementNode).tag).toBe(`p`)
+    })
+
+    test('component v-if', () => {
+      const { node } = parseWithIfTransform(`<Component v-if="ok"></Component>`)
+      expect(node.type).toBe(NodeTypes.IF)
+      expect(node.branches.length).toBe(1)
+      expect((node.branches[0].children[0] as ElementNode).tag).toBe(
+        `Component`
+      )
+      expect((node.branches[0].children[0] as ElementNode).tagType).toBe(
+        ElementTypes.COMPONENT
+      )
+      expect(
+        ((node.branches[0].children[0] as ElementNode)!
+          .codegenNode as VNodeCall)!.isBlock
+      ).toBe(false)
     })
 
     test('v-if + v-else', () => {
@@ -510,6 +528,50 @@ describe('compiler: v-if', () => {
       expect(generate(root).code).toMatchSnapshot()
     })
 
-    test.todo('with comments')
+    test('with comments', () => {
+      const { node } = parseWithIfTransform(`
+          <template v-if="ok">
+            <!--comment1-->
+            <div v-if="ok2">
+              <!--comment2-->
+            </div>
+            <!--comment3-->
+            <b v-else/>
+            <!--comment4-->
+            <p/>
+          </template>
+        `)
+      expect(node.type).toBe(NodeTypes.IF)
+      expect(node.branches.length).toBe(1)
+
+      const b1 = node.branches[0]
+      expect((b1.condition as SimpleExpressionNode).content).toBe(`ok`)
+      expect(b1.children.length).toBe(4)
+
+      expect(b1.children[0].type).toBe(NodeTypes.COMMENT)
+      expect((b1.children[0] as CommentNode).content).toBe(`comment1`)
+
+      expect(b1.children[1].type).toBe(NodeTypes.IF)
+      expect((b1.children[1] as IfNode).branches.length).toBe(2)
+      const b1b1: ElementNode = (b1.children[1] as IfNode).branches[0]
+        .children[0] as ElementNode
+      expect(b1b1.type).toBe(NodeTypes.ELEMENT)
+      expect(b1b1.tag).toBe('div')
+      expect(b1b1.children[0].type).toBe(NodeTypes.COMMENT)
+      expect((b1b1.children[0] as CommentNode).content).toBe('comment2')
+
+      const b1b2: IfBranchNode = (b1.children[1] as IfNode)
+        .branches[1] as IfBranchNode
+      expect(b1b2.children[0].type).toBe(NodeTypes.COMMENT)
+      expect((b1b2.children[0] as CommentNode).content).toBe(`comment3`)
+      expect(b1b2.children[1].type).toBe(NodeTypes.ELEMENT)
+      expect((b1b2.children[1] as ElementNode).tag).toBe(`b`)
+
+      expect(b1.children[2].type).toBe(NodeTypes.COMMENT)
+      expect((b1.children[2] as CommentNode).content).toBe(`comment4`)
+
+      expect(b1.children[3].type).toBe(NodeTypes.ELEMENT)
+      expect((b1.children[3] as ElementNode).tag).toBe(`p`)
+    })
   })
 })

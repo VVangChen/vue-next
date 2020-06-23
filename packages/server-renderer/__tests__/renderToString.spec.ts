@@ -5,16 +5,13 @@ import {
   withScopeId,
   resolveComponent,
   ComponentOptions,
-  Portal,
   ref,
-  defineComponent
+  defineComponent,
+  createTextVNode,
+  createStaticVNode
 } from 'vue'
 import { escapeHtml, mockWarn } from '@vue/shared'
-import {
-  renderToString,
-  renderComponent,
-  SSRContext
-} from '../src/renderToString'
+import { renderToString, renderComponent } from '../src/renderToString'
 import { ssrRenderSlot } from '../src/helpers/ssrRenderSlot'
 
 mockWarn()
@@ -109,7 +106,7 @@ describe('ssr: renderToString', () => {
         await renderToString(createApp({ template: `<` }))
 
         expect(
-          '[Vue warn]: Template compilation error: Unexpected EOF in tag.\n' +
+          'Template compilation error: Unexpected EOF in tag.\n' +
             '1  |  <\n' +
             '   |   ^'
         ).toHaveBeenWarned()
@@ -262,7 +259,7 @@ describe('ssr: renderToString', () => {
         )
       ).toBe(
         `<div>parent<div class="child">` +
-          `<span>from slot</span>` +
+          `<!--[--><span>from slot</span><!--]-->` +
           `</div></div>`
       )
 
@@ -277,7 +274,9 @@ describe('ssr: renderToString', () => {
             }
           })
         )
-      ).toBe(`<div>parent<div class="child">fallback</div></div>`)
+      ).toBe(
+        `<div>parent<div class="child"><!--[-->fallback<!--]--></div></div>`
+      )
     })
 
     test('nested components with vnode slots', async () => {
@@ -321,7 +320,7 @@ describe('ssr: renderToString', () => {
         )
       ).toBe(
         `<div>parent<div class="child">` +
-          `<span>from slot</span>` +
+          `<!--[--><span>from slot</span><!--]-->` +
           `</div></div>`
       )
     })
@@ -333,13 +332,13 @@ describe('ssr: renderToString', () => {
       }
 
       const app = createApp({
+        components: { Child },
         template: `<div>parent<Child v-slot="{ msg }"><span>{{ msg }}</span></Child></div>`
       })
-      app.component('Child', Child)
 
       expect(await renderToString(app)).toBe(
         `<div>parent<div class="child">` +
-          `<span>from slot</span>` +
+          `<!--[--><span>from slot</span><!--]-->` +
           `</div></div>`
       )
     })
@@ -365,6 +364,7 @@ describe('ssr: renderToString', () => {
 
       expect(await renderToString(app)).toBe(
         `<div>parent<div class="child">` +
+          // no comment anchors because slot is used directly as element children
           `<span>from slot</span>` +
           `</div></div>`
       )
@@ -372,7 +372,7 @@ describe('ssr: renderToString', () => {
 
     test('async components', async () => {
       const Child = {
-        // should wait for resovled render context from setup()
+        // should wait for resolved render context from setup()
         async setup() {
           return {
             msg: 'hello'
@@ -461,7 +461,9 @@ describe('ssr: renderToString', () => {
             createCommentVNode('qux')
           ])
         )
-      ).toBe(`<div>foo<span>bar</span><span>baz</span><!--qux--></div>`)
+      ).toBe(
+        `<div>foo<span>bar</span><!--[--><span>baz</span><!--]--><!--qux--></div>`
+      )
     })
 
     test('void elements', async () => {
@@ -511,19 +513,31 @@ describe('ssr: renderToString', () => {
     })
   })
 
-  test('portal', async () => {
-    const ctx: SSRContext = {}
-    await renderToString(
-      h(
-        Portal,
-        {
-          target: `#target`
-        },
-        h('span', 'hello')
-      ),
-      ctx
-    )
-    expect(ctx.portals!['#target']).toBe('<span>hello</span>')
+  describe('raw vnode types', () => {
+    test('Text', async () => {
+      expect(await renderToString(createTextVNode('hello <div>'))).toBe(
+        `hello &lt;div&gt;`
+      )
+    })
+
+    test('Comment', async () => {
+      // https://www.w3.org/TR/html52/syntax.html#comments
+      expect(
+        await renderToString(
+          h('div', [
+            createCommentVNode('>foo'),
+            createCommentVNode('->foo'),
+            createCommentVNode('<!--foo-->'),
+            createCommentVNode('--!>foo<!-')
+          ])
+        )
+      ).toBe(`<div><!--foo--><!--foo--><!--foo--><!--foo--></div>`)
+    })
+
+    test('Static', async () => {
+      const content = `<div id="ok">hello<span>world</span></div>`
+      expect(await renderToString(createStaticVNode(content, 1))).toBe(content)
+    })
   })
 
   describe('scopeId', () => {

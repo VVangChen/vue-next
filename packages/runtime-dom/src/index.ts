@@ -12,12 +12,16 @@ import {
 import { nodeOps } from './nodeOps'
 import { patchProp } from './patchProp'
 // Importing from the compiler, will be tree-shaken in prod
-import { isFunction, isString, isHTMLTag, isSVGTag } from '@vue/shared'
+import { isFunction, isString, isHTMLTag, isSVGTag, extend } from '@vue/shared'
 
-const rendererOptions = {
-  patchProp,
-  ...nodeOps
+declare module '@vue/reactivity' {
+  export interface RefUnwrapBailTypes {
+    // Note: if updating this, also update `types/refBail.d.ts`.
+    runtimeDOMBailTypes: Node | Window
+  }
 }
+
+const rendererOptions = extend({ patchProp }, nodeOps)
 
 // lazy create the renderer - this makes core renderer logic tree-shakable
 // in case the user only imports reactivity utilities from Vue.
@@ -40,7 +44,7 @@ function ensureHydrationRenderer() {
 // use explicit type casts here to avoid import() calls in rolled-up d.ts
 export const render = ((...args) => {
   ensureRenderer().render(...args)
-}) as RootRenderFunction<Node, Element>
+}) as RootRenderFunction<Element>
 
 export const hydrate = ((...args) => {
   ensureHydrationRenderer().hydrate(...args)
@@ -58,17 +62,14 @@ export const createApp = ((...args) => {
     const container = normalizeContainer(containerOrSelector)
     if (!container) return
     const component = app._component
-    if (
-      __RUNTIME_COMPILE__ &&
-      !isFunction(component) &&
-      !component.render &&
-      !component.template
-    ) {
+    if (!isFunction(component) && !component.render && !component.template) {
       component.template = container.innerHTML
     }
     // clear content before mounting
     container.innerHTML = ''
-    return mount(container)
+    const proxy = mount(container)
+    container.removeAttribute('v-cloak')
+    return proxy
   }
 
   return app
@@ -112,7 +113,14 @@ function normalizeContainer(container: Element | string): Element | null {
   return container
 }
 
-// DOM-only runtime directive helpers
+// DOM-only components
+export { Transition, TransitionProps } from './components/Transition'
+export {
+  TransitionGroup,
+  TransitionGroupProps
+} from './components/TransitionGroup'
+
+// **Internal** DOM-only runtime directive helpers
 export {
   vModelText,
   vModelCheckbox,
@@ -122,13 +130,6 @@ export {
 } from './directives/vModel'
 export { withModifiers, withKeys } from './directives/vOn'
 export { vShow } from './directives/vShow'
-
-// DOM-only components
-export { Transition, TransitionProps } from './components/Transition'
-export {
-  TransitionGroup,
-  TransitionGroupProps
-} from './components/TransitionGroup'
 
 // re-export everything from core
 // h, Component, reactivity API, nextTick, flags & types

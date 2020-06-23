@@ -306,14 +306,29 @@ describe('compiler: expression transform', () => {
       ]
     })
   })
-
   test('should not prefix an object property key', () => {
     const node = parseWithExpressionTransform(
-      `{{ { foo: bar } }}`
+      `{{ { foo() { baz() }, value: bar } }}`
     ) as InterpolationNode
     expect(node.content).toMatchObject({
       type: NodeTypes.COMPOUND_EXPRESSION,
-      children: [`{ foo: `, { content: `_ctx.bar` }, ` }`]
+      children: [
+        `{ foo() { `,
+        { content: `_ctx.baz` },
+        `() }, value: `,
+        { content: `_ctx.bar` },
+        ` }`
+      ]
+    })
+  })
+
+  test('should not duplicate object key with same name as value', () => {
+    const node = parseWithExpressionTransform(
+      `{{ { foo: foo } }}`
+    ) as InterpolationNode
+    expect(node.content).toMatchObject({
+      type: NodeTypes.COMPOUND_EXPRESSION,
+      children: [`{ foo: `, { content: `_ctx.foo` }, ` }`]
     })
   })
 

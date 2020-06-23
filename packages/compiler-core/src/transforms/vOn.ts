@@ -11,6 +11,7 @@ import {
 import { capitalize, camelize } from '@vue/shared'
 import { createCompilerError, ErrorCodes } from '../errors'
 import { processExpression } from './transformExpression'
+import { validateBrowserExpression } from '../validateExpression'
 import { isMemberExpression, hasScopeRef } from '../utils'
 
 const fnExpRE = /^([\w$_]+|\([^)]*?\))\s*=>|^function(?:\s+[\w$]+)?\s*\(/
@@ -26,12 +27,12 @@ export interface VOnDirectiveNode extends DirectiveNode {
 }
 
 export const transformOn: DirectiveTransform = (
-  dir: VOnDirectiveNode,
+  dir,
   node,
   context,
   augmentor
 ) => {
-  const { loc, modifiers, arg } = dir
+  const { loc, modifiers, arg } = dir as VOnDirectiveNode
   if (!dir.exp && !modifiers.length) {
     context.onError(createCompilerError(ErrorCodes.X_V_ON_NO_EXPRESSION, loc))
   }
@@ -55,7 +56,9 @@ export const transformOn: DirectiveTransform = (
   }
 
   // handler processing
-  let exp: ExpressionNode | undefined = dir.exp
+  let exp: ExpressionNode | undefined = dir.exp as
+    | SimpleExpressionNode
+    | undefined
   if (exp && !exp.content.trim()) {
     exp = undefined
   }
@@ -80,17 +83,28 @@ export const transformOn: DirectiveTransform = (
       // avoiding the need to be patched.
       if (isCacheable && isMemberExp) {
         if (exp.type === NodeTypes.SIMPLE_EXPRESSION) {
-          exp.content += `($event)`
+          exp.content += `($event, ...args)`
         } else {
-          exp.children.push(`($event)`)
+          exp.children.push(`($event, ...args)`)
         }
       }
+    }
+
+    if (__DEV__ && __BROWSER__) {
+      validateBrowserExpression(
+        exp as SimpleExpressionNode,
+        context,
+        false,
+        hasMultipleStatements
+      )
     }
 
     if (isInlineStatement || (isCacheable && isMemberExp)) {
       // wrap inline statement in a function expression
       exp = createCompoundExpression([
-        `$event => ${hasMultipleStatements ? `{` : `(`}`,
+        `${isInlineStatement ? `$event` : `($event, ...args)`} => ${
+          hasMultipleStatements ? `{` : `(`
+        }`,
         exp,
         hasMultipleStatements ? `}` : `)`
       ])
