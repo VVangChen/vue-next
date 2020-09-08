@@ -68,11 +68,11 @@ describe('compiler: codegen', () => {
     expect(code).toMatchSnapshot()
   })
 
-  test('module mode preamble w/ optimizeBindings: true', () => {
+  test('module mode preamble w/ optimizeImports: true', () => {
     const root = createRoot({
       helpers: [CREATE_VNODE, RESOLVE_DIRECTIVE]
     })
-    const { code } = generate(root, { mode: 'module', optimizeBindings: true })
+    const { code } = generate(root, { mode: 'module', optimizeImports: true })
     expect(code).toMatch(
       `import { ${helperNameMap[CREATE_VNODE]}, ${
         helperNameMap[RESOLVE_DIRECTIVE]
@@ -494,7 +494,7 @@ describe('compiler: codegen', () => {
     )
     expect(code).toMatchInlineSnapshot(`
       "
-      export function ssrRender(_ctx, _push, _parent) {
+      export function ssrRender(_ctx, _push, _parent, _attrs) {
         _push(\`foo\${_renderAttr(id, foo)}bar\`)
       }"
     `)
@@ -515,7 +515,7 @@ describe('compiler: codegen', () => {
       )
       expect(code).toMatchInlineSnapshot(`
         "
-        export function ssrRender(_ctx, _push, _parent) {
+        export function ssrRender(_ctx, _push, _parent, _attrs) {
           if (foo) {
             ok()
           }
@@ -538,7 +538,7 @@ describe('compiler: codegen', () => {
       )
       expect(code).toMatchInlineSnapshot(`
         "
-        export function ssrRender(_ctx, _push, _parent) {
+        export function ssrRender(_ctx, _push, _parent, _attrs) {
           if (foo) {
             foo()
           } else {
@@ -566,7 +566,7 @@ describe('compiler: codegen', () => {
       )
       expect(code).toMatchInlineSnapshot(`
         "
-        export function ssrRender(_ctx, _push, _parent) {
+        export function ssrRender(_ctx, _push, _parent, _attrs) {
           if (foo) {
             foo()
           } else if (bar) {
@@ -595,7 +595,7 @@ describe('compiler: codegen', () => {
       )
       expect(code).toMatchInlineSnapshot(`
         "
-        export function ssrRender(_ctx, _push, _parent) {
+        export function ssrRender(_ctx, _push, _parent, _attrs) {
           if (foo) {
             foo()
           } else if (bar) {

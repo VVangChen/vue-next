@@ -18,7 +18,7 @@ import {
   SuspenseBoundary,
   queueEffectWithSuspense
 } from './components/Suspense'
-import { TeleportImpl } from './components/Teleport'
+import { TeleportImpl, TeleportVNode } from './components/Teleport'
 
 export type RootHydrateFunction = (
   vnode: VNode<Node, Element>,
@@ -80,7 +80,7 @@ export function createHydrationFunctions(
   ): Node | null => {
     const isFragmentStart = isComment(node) && node.data === '['
     const onMismatch = () =>
-      handleMismtach(
+      handleMismatch(
         node,
         vnode,
         parentComponent,
@@ -202,7 +202,7 @@ export function createHydrationFunctions(
           } else {
             nextNode = (vnode.type as typeof TeleportImpl).hydrate(
               node,
-              vnode,
+              vnode as TeleportVNode,
               parentComponent,
               parentSuspense,
               optimized,
@@ -227,7 +227,7 @@ export function createHydrationFunctions(
     }
 
     if (ref != null && parentComponent) {
-      setRef(ref, null, parentComponent, vnode)
+      setRef(ref, null, parentComponent, parentSuspense, vnode)
     }
 
     return nextNode
@@ -244,6 +244,9 @@ export function createHydrationFunctions(
     const { props, patchFlag, shapeFlag, dirs } = vnode
     // skip props & children if this is hoisted static nodes
     if (patchFlag !== PatchFlags.HOISTED) {
+      if (dirs) {
+        invokeDirectiveHook(vnode, null, parentComponent, 'created')
+      }
       // props
       if (props) {
         if (
@@ -397,7 +400,7 @@ export function createHydrationFunctions(
     }
   }
 
-  const handleMismtach = (
+  const handleMismatch = (
     node: Node,
     vnode: VNode,
     parentComponent: ComponentInternalInstance | null,

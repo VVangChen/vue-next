@@ -14,7 +14,8 @@ import {
   ComponentPublicInstance,
   Ref,
   cloneVNode,
-  provide
+  provide,
+  withScopeId
 } from '@vue/runtime-test'
 import { KeepAliveProps } from '../../src/components/KeepAlive'
 
@@ -162,6 +163,36 @@ describe('KeepAlive', () => {
     expect(serializeInner(root)).toBe(`<!---->`)
     assertHookCalls(one, [1, 1, 2, 2, 0])
     assertHookCalls(two, [1, 1, 2, 2, 0])
+  })
+
+  // #1742
+  test('should call lifecycle hooks on nested components when root component no hooks', async () => {
+    const two = {
+      name: 'two',
+      data: () => ({ msg: 'two' }),
+      render(this: any) {
+        return h('div', this.msg)
+      },
+      activated: jest.fn()
+    }
+    const one = {
+      name: 'one',
+      data: () => ({ msg: 'one' }),
+      render(this: any) {
+        return h(two)
+      }
+    }
+
+    const toggle = ref(true)
+    const App = {
+      render() {
+        return h(KeepAlive, () => (toggle.value ? h(one) : null))
+      }
+    }
+    render(h(App), root)
+
+    expect(serializeInner(root)).toBe(`<div>two</div>`)
+    expect(two.activated).toHaveBeenCalledTimes(1)
   })
 
   test('should call correct hooks for nested keep-alive', async () => {
@@ -316,21 +347,33 @@ describe('KeepAlive', () => {
     })
 
     test('max', async () => {
-      const spyA = jest.fn()
-      const spyB = jest.fn()
-      const spyC = jest.fn()
-      const spyAD = jest.fn()
-      const spyBD = jest.fn()
-      const spyCD = jest.fn()
+      const spyAC = jest.fn()
+      const spyBC = jest.fn()
+      const spyCC = jest.fn()
+      const spyAA = jest.fn()
+      const spyBA = jest.fn()
+      const spyCA = jest.fn()
+      const spyADA = jest.fn()
+      const spyBDA = jest.fn()
+      const spyCDA = jest.fn()
+      const spyAUM = jest.fn()
+      const spyBUM = jest.fn()
+      const spyCUM = jest.fn()
 
       function assertCount(calls: number[]) {
         expect([
-          spyA.mock.calls.length,
-          spyAD.mock.calls.length,
-          spyB.mock.calls.length,
-          spyBD.mock.calls.length,
-          spyC.mock.calls.length,
-          spyCD.mock.calls.length
+          spyAC.mock.calls.length,
+          spyAA.mock.calls.length,
+          spyADA.mock.calls.length,
+          spyAUM.mock.calls.length,
+          spyBC.mock.calls.length,
+          spyBA.mock.calls.length,
+          spyBDA.mock.calls.length,
+          spyBUM.mock.calls.length,
+          spyCC.mock.calls.length,
+          spyCA.mock.calls.length,
+          spyCDA.mock.calls.length,
+          spyCUM.mock.calls.length
         ]).toEqual(calls)
       }
 
@@ -338,18 +381,24 @@ describe('KeepAlive', () => {
       const views: Record<string, ComponentOptions> = {
         a: {
           render: () => `one`,
-          created: spyA,
-          unmounted: spyAD
+          created: spyAC,
+          activated: spyAA,
+          deactivated: spyADA,
+          unmounted: spyAUM
         },
         b: {
           render: () => `two`,
-          created: spyB,
-          unmounted: spyBD
+          created: spyBC,
+          activated: spyBA,
+          deactivated: spyBDA,
+          unmounted: spyBUM
         },
         c: {
           render: () => `three`,
-          created: spyC,
-          unmounted: spyCD
+          created: spyCC,
+          activated: spyCA,
+          deactivated: spyCDA,
+          unmounted: spyCUM
         }
       }
 
@@ -361,26 +410,26 @@ describe('KeepAlive', () => {
         }
       }
       render(h(App), root)
-      assertCount([1, 0, 0, 0, 0, 0])
+      assertCount([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
       viewRef.value = 'b'
       await nextTick()
-      assertCount([1, 0, 1, 0, 0, 0])
+      assertCount([1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0])
 
       viewRef.value = 'c'
       await nextTick()
       // should prune A because max cache reached
-      assertCount([1, 1, 1, 0, 1, 0])
+      assertCount([1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0])
 
       viewRef.value = 'b'
       await nextTick()
       // B should be reused, and made latest
-      assertCount([1, 1, 1, 0, 1, 0])
+      assertCount([1, 1, 1, 1, 1, 2, 1, 0, 1, 1, 1, 0])
 
       viewRef.value = 'a'
       await nextTick()
       // C should be pruned because B was used last so C is the oldest cached
-      assertCount([2, 1, 1, 0, 1, 1])
+      assertCount([2, 2, 1, 1, 1, 2, 2, 0, 1, 1, 1, 1])
     })
   })
 
@@ -567,7 +616,7 @@ describe('KeepAlive', () => {
     })
   })
 
-  it('should not call onVnodeUnmounted', async () => {
+  it('should call correct vnode hooks', async () => {
     const Foo = markRaw({
       name: 'Foo',
       render() {
@@ -643,14 +692,42 @@ describe('KeepAlive', () => {
     await nextTick()
 
     expect(spyMounted).toHaveBeenCalledTimes(2)
-    expect(spyUnmounted).toHaveBeenCalledTimes(0)
+    expect(spyUnmounted).toHaveBeenCalledTimes(1)
 
     toggle()
     await nextTick()
+    expect(spyMounted).toHaveBeenCalledTimes(3)
+    expect(spyUnmounted).toHaveBeenCalledTimes(2)
+
     render(null, root)
     await nextTick()
+    expect(spyMounted).toHaveBeenCalledTimes(3)
+    expect(spyUnmounted).toHaveBeenCalledTimes(4)
+  })
 
-    expect(spyMounted).toHaveBeenCalledTimes(2)
-    expect(spyUnmounted).toHaveBeenCalledTimes(2)
+  // #1513
+  test('should work with cloned root due to scopeId / fallthrough attrs', async () => {
+    const viewRef = ref('one')
+    const instanceRef = ref<any>(null)
+    const withId = withScopeId('foo')
+    const App = {
+      __scopeId: 'foo',
+      render: withId(() => {
+        return h(KeepAlive, null, {
+          default: () => h(views[viewRef.value], { ref: instanceRef })
+        })
+      })
+    }
+    render(h(App), root)
+    expect(serializeInner(root)).toBe(`<div foo>one</div>`)
+    instanceRef.value.msg = 'changed'
+    await nextTick()
+    expect(serializeInner(root)).toBe(`<div foo>changed</div>`)
+    viewRef.value = 'two'
+    await nextTick()
+    expect(serializeInner(root)).toBe(`<div foo>two</div>`)
+    viewRef.value = 'one'
+    await nextTick()
+    expect(serializeInner(root)).toBe(`<div foo>changed</div>`)
   })
 })

@@ -46,8 +46,8 @@ type ModelDirective<T> = ObjectDirective<T & { _assign: AssignerFn }>
 export const vModelText: ModelDirective<
   HTMLInputElement | HTMLTextAreaElement
 > = {
-  beforeMount(el, { value, modifiers: { lazy, trim, number } }, vnode) {
-    el.value = value
+  created(el, { value, modifiers: { lazy, trim, number } }, vnode) {
+    el.value = value == null ? '' : value
     el._assign = getModelAssigner(vnode)
     const castToNumber = number || el.type === 'number'
     addEventListener(el, lazy ? 'change' : 'input', e => {
@@ -75,11 +75,8 @@ export const vModelText: ModelDirective<
       addEventListener(el, 'change', onCompositionEnd)
     }
   },
-  beforeUpdate(el, { value, oldValue, modifiers: { trim, number } }, vnode) {
+  beforeUpdate(el, { value, modifiers: { trim, number } }, vnode) {
     el._assign = getModelAssigner(vnode)
-    if (value === oldValue) {
-      return
-    }
     if (document.activeElement === el) {
       if (trim && el.value.trim() === value) {
         return
@@ -88,12 +85,15 @@ export const vModelText: ModelDirective<
         return
       }
     }
-    el.value = value
+    const newValue = value == null ? '' : value
+    if (el.value !== newValue) {
+      el.value = newValue
+    }
   }
 }
 
 export const vModelCheckbox: ModelDirective<HTMLInputElement> = {
-  beforeMount(el, binding, vnode) {
+  created(el, binding, vnode) {
     setChecked(el, binding, vnode)
     el._assign = getModelAssigner(vnode)
     addEventListener(el, 'change', () => {
@@ -138,7 +138,7 @@ function setChecked(
 }
 
 export const vModelRadio: ModelDirective<HTMLInputElement> = {
-  beforeMount(el, { value }, vnode) {
+  created(el, { value }, vnode) {
     el.checked = looseEqual(value, vnode.props!.value)
     el._assign = getModelAssigner(vnode)
     addEventListener(el, 'change', () => {
@@ -154,16 +154,19 @@ export const vModelRadio: ModelDirective<HTMLInputElement> = {
 }
 
 export const vModelSelect: ModelDirective<HTMLSelectElement> = {
-  // use mounted & updated because <select> relies on its children <option>s.
-  mounted(el, { value }, vnode) {
-    setSelected(el, value)
-    el._assign = getModelAssigner(vnode)
+  created(el, binding, vnode) {
     addEventListener(el, 'change', () => {
       const selectedVal = Array.prototype.filter
         .call(el.options, (o: HTMLOptionElement) => o.selected)
         .map(getValue)
       el._assign(el.multiple ? selectedVal : selectedVal[0])
     })
+    el._assign = getModelAssigner(vnode)
+  },
+  // set value in mounted & updated because <select> relies on its children
+  // <option>s.
+  mounted(el, { value }) {
+    setSelected(el, value)
   },
   beforeUpdate(el, _binding, vnode) {
     el._assign = getModelAssigner(vnode)
@@ -217,8 +220,8 @@ function getCheckboxValue(
 export const vModelDynamic: ObjectDirective<
   HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
 > = {
-  beforeMount(el, binding, vnode) {
-    callModelHook(el, binding, vnode, null, 'beforeMount')
+  created(el, binding, vnode) {
+    callModelHook(el, binding, vnode, null, 'created')
   },
   mounted(el, binding, vnode) {
     callModelHook(el, binding, vnode, null, 'mounted')
@@ -236,7 +239,7 @@ function callModelHook(
   binding: DirectiveBinding,
   vnode: VNode,
   prevVNode: VNode | null,
-  hook: 'beforeMount' | 'mounted' | 'beforeUpdate' | 'updated'
+  hook: keyof ObjectDirective
 ) {
   let modelToUse: ObjectDirective
   switch (el.tagName) {
@@ -247,7 +250,7 @@ function callModelHook(
       modelToUse = vModelText
       break
     default:
-      switch (el.type) {
+      switch (vnode.props && vnode.props.type) {
         case 'checkbox':
           modelToUse = vModelCheckbox
           break
